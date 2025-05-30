@@ -1,10 +1,11 @@
 name: boss_simulation
 channels:
-- bioconda
 - conda-forge
+- bioconda
 dependencies:
 - python=3.12
 - samtools=1.21
 - numpy=1.26.4
 - minimap2=2.26
+- scipy=1.12
 
