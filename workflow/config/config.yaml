@@ -1,6 +1,8 @@
 
 
-ref: 'data/zymo.fa'
+exp_name: 'accept_unmapped_test_sim_chr21_wout_time'
+ref: '/nfs/research/goldman/ipoetzsch/trio_exp2/GCA_009914755-chromosome-21.fasta'
+reads: '/hps/nobackup/goldman/ipoetzsch/accept_unmapped_test_sim_chr21_wout_time/'
 conditions:
   - 'boss'
   - 'control'
