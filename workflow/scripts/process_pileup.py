@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.integrate as integrate
 import subprocess
 import sys
 
@@ -42,6 +43,27 @@ def calc_lowcov(cov: np.array, otu_size: int, lowcov_threshold: int = 5) -> floa
     lowcov_p = lowcov_n / otu_size
     return lowcov_p
 
+def calc_evenness(cov: np.array, otu_size: int) -> float:
+    '''
+    Calculate the evenness of coverage sites in the OTU
+    as described in Mokry et al, 2010, Nucleic Acids Research.
+
+    :param cov: array of coverage counts
+    :param otu_size: genome size
+    :return: evenness of coverage
+    '''
+    def _calc_evn(i, cov, otu_size) -> float:
+        avg_cov = np.average(cov)
+        cov_norm = cov/avg_cov
+        p_i = np.count_nonzero(cov_norm >= (i/avg_cov))
+
+        evn = p_i/otu_size
+        return evn
+
+    evenness = integrate.quad(_calc_evn, 0, 1, args=(cov, otu_size))
+    
+    return evenness[0]
+
 
 
 def process_pup(pup: str, otu_size: int) -> str:
@@ -60,7 +82,9 @@ def process_pup(pup: str, otu_size: int) -> str:
     mean_cov = np.sum(cov) / otu_size
     # calculate the proportion of low coverage sites
     lowcov_p = calc_lowcov(cov=cov, otu_size=otu_size)
-    output = f'{cond},{time},{otu},{mean_cov},{lowcov_p}'
+    # calculate the evenness of coverage of the OTU
+    evenness = calc_evenness(cov=cov, otu_size=otu_size)
+    output = f'{cond},{time},{otu},{mean_cov},{lowcov_p},{evenness}'
     return output
 
 

@@ -1,4 +1,5 @@
 from config.otu_info import otus_clean_names, otus_no_plasmids, genome_sizes
+from datetime import datetime
 
 
 # load config specific to this simulation
@@ -9,18 +10,23 @@ path = config['reads']
 ref = config['ref']
 conditions = config['conditions']
 mu = config['mu']
+dump_time = config['dump_time']
+pores = config['pores']
+log_time_stamp = config['log_time_stamp']
 timepoints = list(range(config['max_timepoint'] + 1))
 otus_cleaned = list(set(otus_clean_names.values()))
 otus_no_plasmids_rev = {v: k for k, v in otus_no_plasmids.items()}
 otu = 'hschr21'
+today = datetime.now().strftime("%Y-%m-%d_")
 
 
 
 rule all:
     input:
-        'results/unblocks.csv',
-        'results/coverage.csv',
-        'results/simulation.png'
+        f"results/{exp}/unblocks.csv",
+        f"results/{exp}/coverage.csv",
+        f"results/{exp}/{today}simulation.png",
+        f"results/{exp}/{today}simulation_seqt.png"
 
 
 
@@ -139,24 +145,46 @@ rule create_coverage_dataframe:
         "cat <(echo cond,time,otu,mean_coverage,low_coverage_prop,evenness) {input} > {output}"
 
 
+rule analyse_log:
+    # extract time stamps from log file
+    input:
+        log_file=f"{path}{log_time_stamp}_boss.log"
+    output:
+        analysed_log=f"results/{exp}/{log_time_stamp}_boss_log_processed.csv"
+    params:
+        otu = otu
+    conda: "envs/simulation.yaml"
+    shell:
+        "python workflow/scripts/analyse_boss_log.py {input.log_file} {output.analysed_log} {params.otu}"
+
 
 rule visualise_simulation:
     # create a pdf with some visualisations of the simulation
     input:
         coverage=f"results/{exp}/coverage.csv",
         unblocks=f"results/{exp}/unblocks.csv",
+        analysed_log=f"results/{exp}/{log_time_stamp}_boss_log_processed.csv"
     output:
-        "results/simulation.png"
+        sim=f"results/{exp}/{today}simulation.png",
+        sim_seqt=f"results/{exp}/{today}simulation_seqt.png"
     conda: "envs/visualisation.yaml"
     localrule: True
     params:
-        exp = exp
+        exp = exp,
+        dump_time = dump_time,
+        pores = pores,
+        genome_size=genome_sizes[otu]
     shell:
         "mkdir -p results/{params.exp} &&"
         "Rscript workflow/scripts/visualise_simulation.R "
         " --input_cov {input.coverage} " 
-        " --input_unb {input.unblocks} " 
-        " --output {output} "
+        " --input_unb {input.unblocks} "
+        " --dump_time {params.dump_time} "
+        " --pores {params.pores} "
+        " --genome_size {params.genome_size} "
+        " --analysed_log {input.analysed_log}"
+        " --output {output.sim} "
+        " --output_seqt {output.sim_seqt} "
 
 
 
