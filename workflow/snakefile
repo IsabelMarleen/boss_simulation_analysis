@@ -113,37 +113,46 @@ rule record_unblocks:
 rule create_unblock_dataframe:
     # merge the unblock counts into a single csv
     input:
-        expand("05_rejected/{cond}_{time}_{otu}.csv", cond=conditions, time=timepoints, otu=otus_cleaned),
+        expand(f"{exp}/05_rejected/{{cond}}_{{time}}_{{otu}}.csv", cond=conditions, time=timepoints, otu=otus_cleaned),
     output:
-        "results/unblocks.csv"
+        f"results/{exp}/unblocks.csv"
     localrule: True
+    params:
+        exp = exp
     shell:
-        "cat <(echo cond,time,otu,total,unb,unb_ratio) {input} > {output}"
+        "mkdir -p results/{params.exp} &&"
+        "cat <(echo cond,time,otu,total,base_total,unb,unb_ratio) {input} > {output}"
 
 
 
 rule create_coverage_dataframe:
     # merge the coverage data into a single csv
     input:
-        expand("04_pup/{cond}_{time}_{otu}.csv", cond=conditions, time=timepoints, otu=otus_cleaned),
+        expand(f"{exp}/04_pup/{{cond}}_{{time}}_{{otu}}.csv", cond=conditions, time=timepoints, otu=otus_cleaned),
     output:
-        "results/coverage.csv"
+        f"results/{exp}/coverage.csv"
     localrule: True
+    params:
+        exp = exp
     shell:
-        "cat <(echo cond,time,otu,mean_coverage,low_coverage_prop) {input} > {output}"
+        "mkdir -p results/{params.exp} &&"
+        "cat <(echo cond,time,otu,mean_coverage,low_coverage_prop,evenness) {input} > {output}"
 
 
 
 rule visualise_simulation:
     # create a pdf with some visualisations of the simulation
     input:
-        coverage="results/coverage.csv",
-        unblocks="results/unblocks.csv"
+        coverage=f"results/{exp}/coverage.csv",
+        unblocks=f"results/{exp}/unblocks.csv",
     output:
         "results/simulation.png"
     conda: "envs/visualisation.yaml"
     localrule: True
+    params:
+        exp = exp
     shell:
+        "mkdir -p results/{params.exp} &&"
         "Rscript workflow/scripts/visualise_simulation.R "
         " --input_cov {input.coverage} " 
         " --input_unb {input.unblocks} " 
