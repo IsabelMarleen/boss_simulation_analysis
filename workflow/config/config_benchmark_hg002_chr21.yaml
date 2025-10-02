@@ -1,0 +1,12 @@
+exp_name: 'benchmark_hg002_chr21'
+
+ref: '/hps/nobackup/goldman/ipoetzsch/benchmark_hg002_chr21/data/Homo_sapiens.GRCh38.dna.chromosome.21.fa'
+reads: '/hps/nobackup/goldman/ipoetzsch/'
+conditions:
+  - 'boss'
+  - 'control'
+max_timepoint: 32
+mu: 400
+dump_time: 35_000_000
+pores: 512
+log_time_stamp: '20250905-193019'

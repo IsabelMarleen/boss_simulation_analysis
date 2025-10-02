@@ -1,0 +1,12 @@
+
+exp_name: 'accept_unmapped_test_sim_chr21_wout_corrected'
+ref: '/nfs/research/goldman/ipoetzsch/trio_exp2/GCA_009914755-chromosome-21.fasta'
+reads: '/hps/nobackup/goldman/ipoetzsch/accept_unmapped_test_sim_chr21_corrected/'
+conditions:
+  - 'boss'
+  - 'control'
+max_timepoint: 24
+mu: 400
+dump_time: 35_000_000
+pores: 512
+log_time_stamp: '20250602-142203'
