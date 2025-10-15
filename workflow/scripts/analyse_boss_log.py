@@ -1,8 +1,7 @@
-import numpy as np
 import re
 import sys
 
-def analyse_log(path, out_path, otu):
+def analyse_log(path, out_path):
     contr_line = 'control'
     boss_line = 'boss'
     all_batches_total = 0
@@ -13,7 +12,7 @@ def analyse_log(path, out_path, otu):
     boss_dump = 1
 
     with open(out_path, "w") as o:
-        o.write('cond,time,dump,otu,total,base_total,unb,unb_ratio\n')
+        o.write('cond,time,dump,total,base_total,unb,unb_ratio\n')
         with open(path, "r") as f:
             for line in f.readlines():
                 time = re.findall(r'Next batch ---------------------------- # (\d+)', line)
@@ -49,16 +48,16 @@ def analyse_log(path, out_path, otu):
                 dc = re.findall(r'.+ dump control #(\d+)', line)
                 if len(dc) != 0:
                     contr_dump = int(dc[0])
-                    contr_line = f"{contr_line},{time_contr},{contr_dump},{otu},{all_batches_total},{0},{0},{0}\n"
+                    contr_line = f"{contr_line},{time_contr},{contr_dump},{all_batches_total},{0},{0},{0}\n"
                     o.write(contr_line)
                     contr_line = 'control'
                     continue
 
-                # o.write('cond,time,dump,otu,total,base_total,unb,unb_ratio\n')
+                # o.write('cond,time,dump,total,base_total,unb,unb_ratio\n')
                 db = re.findall(r'.+ dump boss #(\d+)', line)
                 if len(db) != 0:
                     boss_dump = int(db[0])
-                    boss_line = f"{boss_line},{time_boss},{boss_dump},{otu},{all_batches_total},{0},{all_batches_reject},{all_batches_reject/all_batches_total}\n"
+                    boss_line = f"{boss_line},{time_boss},{boss_dump},{all_batches_total},{0},{all_batches_reject},{all_batches_reject/all_batches_total}\n"
                     o.write(boss_line)
                     boss_line = 'boss'
                     continue
@@ -66,4 +65,4 @@ def analyse_log(path, out_path, otu):
 
 if __name__ == "__main__":
     # input to this script is the logfile produced by the run
-    analyse_log(path=sys.argv[1], out_path=sys.argv[2], otu=sys.argv[3])
+    analyse_log(path=sys.argv[1], out_path=sys.argv[2])
