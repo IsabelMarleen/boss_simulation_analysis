@@ -6,7 +6,11 @@ from datetime import datetime
 configfile: "workflow/config/config.yaml"
 
 exp = config['exp_name']
-path = config['reads']
+if config['reads'] == '':
+    path = config['path']
+else:
+    path = config['reads'] + exp + '/'
+    
 ref = config['ref']
 conditions = config['conditions']
 mu = config['mu']
@@ -16,8 +20,9 @@ log_time_stamp = config['log_time_stamp']
 timepoints = list(range(config['max_timepoint'] + 1))
 otus_cleaned = list(set(otus_clean_names.values()))
 otus_no_plasmids_rev = {v: k for k, v in otus_no_plasmids.items()}
-otu = 'hschr21'
+# otu = 'hschr21'
 today = datetime.now().strftime("%Y-%m-%d_")
+snakefile_path = '/hps/nobackup/goldman/ipoetzsch/boss_simulation_example/'
 
 
 
@@ -30,31 +35,34 @@ rule all:
 
 
 
-# rule map_paf:
-#     # map the reads from the simulation to a reference containing all species
-#     # this is done to separate the reads by target species
-#     input: f"{path}00_reads/{{cond}}_{{time}}.fa"
-#     output: "01_paf/{cond}_{time}.paf"
-#     params:
-#         ref = ref,
-#     conda: "envs/simulation.yaml"
-#     shell:
-#         "minimap2 -x map-ont -t {threads} --secondary=no -c {params.ref} {input} >{output}"
+rule map_paf:
+    # map the reads from the simulation to a reference containing all species
+    # this is done to separate the reads by target species
+    input: f"{path}00_reads/{{cond}}_{{time}}.fa"
+    output: f"results/{exp}/01_paf/{{cond}}_{{time}}.paf"
+    params:
+        ref = ref,
+        exp = exp
+    conda: "envs/simulation.yaml"
+    shell:
+        "minimap2 -x map-ont -t {threads} --secondary=no -c {params.ref} {input} >{output}"
 
 
 
 
-# rule separate_target:
-#     # separates the reads by target species using the mappings
-#     # this results in files per: condition_time_otu.fq
-#     input:
-#         reads = f"{path}00_reads/{{cond}}_{{time}}.fa",
-#         paf = "01_paf/{cond}_{time}.paf"
-#     output: expand("02_sep_target/{{cond}}_{{time}}_{otu}.fq", otu=otus_cleaned)
-#     conda: "envs/simulation.yaml"
-#     shell:
-#         "python workflow/scripts/separate_by_target.py {input.paf} {input.reads} && "
-#         "mv {wildcards.cond}_{wildcards.time}_*.fq 02_sep_target/ "
+rule separate_target:
+    # separates the reads by target species using the mappings
+    # this results in files per: condition_time_otu.fq
+    input:
+        reads = f"{path}00_reads/{{cond}}_{{time}}.fa",
+        paf = f"results/{exp}/01_paf/{{cond}}_{{time}}.paf"
+    output: expand("results/{exp}/02_sep_target/{{cond}}_{{time}}_{otu}.fq", otu=otus_cleaned, exp=exp)
+    params:
+        exp=exp
+    conda: "envs/simulation.yaml"
+    shell:
+        "python3 {snakefile_path}workflow/scripts/separate_by_target.py {input.paf} {input.reads} && "
+        "mv {wildcards.cond}_{wildcards.time}_*.fq results/{exp}/02_sep_target/"
 
 
 
@@ -63,40 +71,40 @@ rule map_sam:
     # we map the reads again, but this time only to the identified target species
     # the alignments are sorted, converted to bam, and indexed
     input:
-        reads = f"{path}00_reads/{{cond}}_{{time}}.fa",
+        reads = f"results/{exp}/02_sep_target/{{cond}}_{{time}}_{{otu}}.fq",
     output:
-        bam = f"{exp}/03_bams/{{cond}}_{{time}}_{otu}.bam",
-        bai = f"{exp}/03_bams/{{cond}}_{{time}}_{otu}.bam.bai"
+        bam = f"results/{exp}/03_bams/{{cond}}_{{time}}_{{otu}}.bam",
+        bai = f"results/{exp}/03_bams/{{cond}}_{{time}}_{{otu}}.bam.bai"
     params:
         ref=ref,
-        otu_raw=otus_no_plasmids_rev[otu],
-        otu=otu,
+        otu_raw=lambda w: f"{otus_no_plasmids_rev[w.otu]}",
         exp=exp
     conda: "envs/simulation.yaml"
     shell:
         "mkdir -p data/{params.exp}_otu && "
-        "python workflow/scripts/extract_sequence.py {params.ref} {params.otu_raw} > data/{params.exp}_otu/{params.otu}.fa && "
-        "minimap2 -ax map-ont -t {threads} --secondary=no --sam-hit-only -c data/{params.exp}_otu/{params.otu}.fa {input.reads} | "
+        "python3 {snakefile_path}workflow/scripts/extract_sequence.py {params.ref} \"{params.otu_raw}\" > data/{params.exp}_otu/{wildcards.otu}.fa && "
+        "minimap2 -ax map-ont -t {threads} --secondary=no --sam-hit-only -c data/{params.exp}_otu/{wildcards.otu}.fa {input.reads} | "
         "samtools sort -@ {threads} | samtools view -b >{output.bam} && "
-        "samtools index -@ {threads} {output.bam}"
-
+        "samtools index -@ {threads} {output.bam} &&"
+        "if [ {wildcards.time} != 0 ]; then [[ -s {output.bam} ]]; fi "
 
 
 rule pileup:
     # create a pileup from the mappings of each otu at each timepoint
     # the python script extracts the mean coverage and proportion of low coverage sites from the pileup
     input:
-        bam = f"{exp}/03_bams/{{cond}}_{{time}}_{{otu}}.bam",
-        bai = f"{exp}/03_bams/{{cond}}_{{time}}_{{otu}}.bam.bai"
+        bam = f"results/{exp}/03_bams/{{cond}}_{{time}}_{{otu}}.bam",
+        bai = f"results/{exp}/03_bams/{{cond}}_{{time}}_{{otu}}.bam.bai"
     output:
-        pup = f"{exp}/04_pup/{{cond}}_{{time}}_{{otu}}.pup",
-        pup_csv = f"{exp}/04_pup/{{cond}}_{{time}}_{{otu}}.csv",
+        pup = f"results/{exp}/04_pup/{{cond}}_{{time}}_{{otu}}.pup",
+        pup_csv = f"results/{exp}/04_pup/{{cond}}_{{time}}_{{otu}}.csv",
+        pup_full = f"results/{exp}/04_pup/{{cond}}_{{time}}_{{otu}}_full.csv"
     params:
         genome_size=lambda w: genome_sizes[w.otu]
     conda: "envs/simulation.yaml"
     shell:
         "samtools mpileup -Q 0 {input.bam} > {output.pup} && "
-        "python workflow/scripts/process_pileup.py {output.pup} {params.genome_size} > {output.pup_csv}"
+        "python3 {snakefile_path}workflow/scripts/process_pileup.py {output.pup} {params.genome_size} {output.pup_full} > {output.pup_csv}" 
 
 
 
@@ -105,21 +113,21 @@ rule record_unblocks:
     # count the number of total reads and unblocked reads for each otu at each timepoint
     # since it's a simulation we can just check which reads are mu-sized to identify unblocked reads
     input:
-        reads = f"{path}00_reads/{{cond}}_{{time}}.fa",
+        f"results/{exp}/02_sep_target/{{cond}}_{{time}}_{{otu}}.fq"
     output:
-        f"{exp}/05_rejected/{{cond}}_{{time}}_{{otu}}.csv"
+        f"results/{exp}/05_rejected/{{cond}}_{{time}}_{{otu}}.csv"
     params:
         mu = mu
     conda: "envs/simulation.yaml"
     shell:
-        "python workflow/scripts/record_unblocks.py {input} {params.mu} > {output}"
+        "python3 {snakefile_path}workflow/scripts/record_unblocks.py {input} {params.mu} > {output}"
 
 
 
 rule create_unblock_dataframe:
     # merge the unblock counts into a single csv
     input:
-        expand(f"{exp}/05_rejected/{{cond}}_{{time}}_{{otu}}.csv", cond=conditions, time=timepoints, otu=otus_cleaned),
+        expand(f"results/{exp}/05_rejected/{{cond}}_{{time}}_{{otu}}.csv", cond=conditions, time=timepoints, otu=otus_cleaned),
     output:
         f"results/{exp}/unblocks.csv"
     localrule: True
@@ -134,7 +142,7 @@ rule create_unblock_dataframe:
 rule create_coverage_dataframe:
     # merge the coverage data into a single csv
     input:
-        expand(f"{exp}/04_pup/{{cond}}_{{time}}_{{otu}}.csv", cond=conditions, time=timepoints, otu=otus_cleaned),
+        expand(f"results/{exp}/04_pup/{{cond}}_{{time}}_{{otu}}.csv", cond=conditions, time=timepoints, otu=otus_cleaned),
     output:
         f"results/{exp}/coverage.csv"
     localrule: True
@@ -151,11 +159,9 @@ rule analyse_log:
         log_file=f"{path}{log_time_stamp}_boss.log"
     output:
         analysed_log=f"results/{exp}/{log_time_stamp}_boss_log_processed.csv"
-    params:
-        otu = otu
     conda: "envs/simulation.yaml"
     shell:
-        "python workflow/scripts/analyse_boss_log.py {input.log_file} {output.analysed_log} {params.otu}"
+        "python3 {snakefile_path}workflow/scripts/analyse_boss_log.py {input.log_file} {output.analysed_log}"
 
 
 rule visualise_simulation:
@@ -173,15 +179,15 @@ rule visualise_simulation:
         exp = exp,
         dump_time = dump_time,
         pores = pores,
-        genome_size=genome_sizes[otu]
+        # genome_size=lambda w: genome_sizes[w.otu]
     shell:
         "mkdir -p results/{params.exp} &&"
-        "Rscript workflow/scripts/visualise_simulation.R "
+        "Rscript {snakefile_path}workflow/scripts/visualise_simulation.R "
         " --input_cov {input.coverage} " 
         " --input_unb {input.unblocks} "
         " --dump_time {params.dump_time} "
         " --pores {params.pores} "
-        " --genome_size {params.genome_size} "
+        # " --genome_size {params.genome_size} "
         " --analysed_log {input.analysed_log}"
         " --output {output.sim} "
         " --output_seqt {output.sim_seqt} "
