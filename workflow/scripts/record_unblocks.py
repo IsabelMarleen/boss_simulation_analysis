@@ -17,8 +17,7 @@ def process_fq(fq: str, mu: int) -> str:
     '''
     # get metadata from the filename
     meta = fq.split("/")[-1].split(".")[0].split('_')
-    cond, time = meta[0], meta[1]
-    otu = "hschr21"
+    cond, time, otu = meta[0], meta[1], meta[2]
     total = 0
     unb = 0
     base_total = 0
