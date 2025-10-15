@@ -12,16 +12,28 @@ def parse_pup(pup_path: str) -> np.array:
     :return: array of coverage
     '''
     # extract 4th column only
-    running = subprocess.Popen(
+    running2 = subprocess.Popen(
+        args=f"cut -f2 {pup_path}",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        encoding='utf-8',
+        shell=True
+    )
+    stdout2, stderr2 = running2.communicate()
+    running4 = subprocess.Popen(
         args=f"cut -f4 {pup_path}",
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         encoding='utf-8',
         shell=True
     )
-    stdout, stderr = running.communicate()
+    stdout4, stderr4 = running4.communicate()
     # parse to array of coverage
-    cov = np.array([i for i in stdout.split("\n") if i], dtype="int")
+    pos = np.array([i for i in stdout2.split("\n") if i], dtype="int")
+    coverage = np.array([i for i in stdout4.split("\n") if i], dtype="int")
+
+    cov = np.array([pos, coverage], dtype="int")
+    
     return cov
 
 
@@ -66,7 +78,7 @@ def calc_evenness(cov: np.array, otu_size: int) -> float:
 
 
 
-def process_pup(pup: str, otu_size: int) -> str:
+def process_pup(pup: str, otu_size: int, pup_full: str) -> str:
     '''
     Process the pileup file to extract the mean coverage and proportion of low coverage sites
     :param pup: path of pileup file
@@ -78,12 +90,13 @@ def process_pup(pup: str, otu_size: int) -> str:
     cond, time, otu = meta[0], meta[1], meta[2]
     # get an array of coverage from the pileup file
     cov = parse_pup(pup_path=pup)
+    np.savetxt(pup_full, cov)
     # calculate the mean coverage of the OTU
-    mean_cov = np.sum(cov) / otu_size
+    mean_cov = np.sum(cov[1]) / otu_size
     # calculate the proportion of low coverage sites
-    lowcov_p = calc_lowcov(cov=cov, otu_size=otu_size)
+    lowcov_p = calc_lowcov(cov=cov[1], otu_size=otu_size)
     # calculate the evenness of coverage of the OTU
-    evenness = calc_evenness(cov=cov, otu_size=otu_size)
+    evenness = calc_evenness(cov=cov[1], otu_size=otu_size)
     output = f'{cond},{time},{otu},{mean_cov},{lowcov_p},{evenness}'
     return output
 
@@ -92,7 +105,7 @@ def process_pup(pup: str, otu_size: int) -> str:
 if __name__ == "__main__":
     # input to this script is the output of samtools pileup
     # also pass in the genome size of the OTU to calculate the mean coverage
-    data = process_pup(pup=sys.argv[1], otu_size=int(sys.argv[2]))
+    data = process_pup(pup=sys.argv[1], otu_size=int(sys.argv[2]), pup_full = sys.argv[3])
     print(data)
 
 
