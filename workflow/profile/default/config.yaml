@@ -1,8 +1,8 @@
 executor: slurm
 default-resources:
   slurm_account: 'goldman'
-  mem: 15GB
-  cpus_per_task: 4
+  mem: 5GB
+  cpus_per_task: 1
   runtime: 50
 
 printshellcmds: True
@@ -16,6 +16,11 @@ set-threads:
   map_sam: 4
   pileup: 4
 
+retries: 2
+
+latency-wait: 60
+
+jobs: 100
 
 groups:
   - record_unblocks=UNBLOCK
